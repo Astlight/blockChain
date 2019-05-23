@@ -2,14 +2,26 @@
 import hashlib
 import json
 from time import time
+from urllib.parse import urlparse
 
 
-class BlockCahin():
+class BlockChain():
     def __init__(self):
         self.chain = []  # 区块list
         self.current_transactions = []  # 交易list
         # 创世区块
         self.new_block(previous_hash=1, proof=100)
+        # 节点
+        self.nodes = set()
+
+    def register_node(self, address):
+        """
+        Add a new node to the list of nodes
+        :param address: <str> Address of node. Eg. 'http://192.168.0.5:5000'
+        :return: None
+        """
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)  # ip
 
     def new_block(self, proof, previous_hash=None):
         """
@@ -44,8 +56,9 @@ class BlockCahin():
             "recipient": recipient,
             "amount": amount
         })
-        return self.last_block["index"] + 1
+        return self.last_block["index"] + 1  # 最近的chain中的index + 1
 
+    # hash上一block存在新块
     @staticmethod
     def hash(block):
         """
@@ -56,6 +69,7 @@ class BlockCahin():
         block_string = json.dumps(block, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
+    # 属性
     @property
     def last_block(self):
         return self.chain[-1]
@@ -73,6 +87,7 @@ class BlockCahin():
             proof += 1
         return proof
 
+    # 挖矿
     @staticmethod
     def valid_proof(last_proof, proof):
         """
@@ -84,6 +99,28 @@ class BlockCahin():
         guess = f'{last_proof}{proof}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
+
+    # 检查是否是有效链，遍历每个块验证 hash 和 proof
+    def valid_chain(self, chain):
+        """
+        Determine if a given blockchain is valid
+        :param chain: <list> A blockchain
+        :return: <bool> True if valid, False if not
+        """
+        last_block = chain[0]
+        current_index = 1
+        while current_index < len(chain):
+            block = chain[current_index]
+
+            # 校验前后块hash
+            if block["previous_hash"] != self.hash(last_block):
+                return False
+
+            # 校验前后块proof
+            if not self.valid_proof(last_block["proof"], block["proof"]):
+                return False
+
+
 
 
 '''
@@ -99,5 +136,6 @@ block = {
     ],  
     'proof': 324984774000,   # 工作量证明
     'previous_hash': "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" #前一个区块的 Hash 值  
-} 
+}
+https://www.cnblogs.com/chendongsheng/p/8537496.html 
 '''
