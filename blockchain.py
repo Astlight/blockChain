@@ -4,6 +4,8 @@ import json
 from time import time
 from urllib.parse import urlparse
 
+from pip._vendor import requests
+
 
 class BlockChain():
     def __init__(self):
@@ -100,15 +102,15 @@ class BlockChain():
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
 
-    # 检查是否是有效链，遍历每个块验证 hash 和 proof
+    # 检查是否是有效链，遍历每个块验证 hash 和 proof。 在resole_conflicts中使用
     def valid_chain(self, chain):
         """
         Determine if a given blockchain is valid
         :param chain: <list> A blockchain
         :return: <bool> True if valid, False if not
         """
-        last_block = chain[0]
-        current_index = 1
+        last_block = chain[0]  # 初始块在服务启动时生成(previous_hash=1, proof=100)
+        current_index = 1  # 第二块开始校验区块正确性
         while current_index < len(chain):
             block = chain[current_index]
 
@@ -120,7 +122,36 @@ class BlockChain():
             if not self.valid_proof(last_block["proof"], block["proof"]):
                 return False
 
+            last_block = block
 
+        return True
+
+    def resolve_conflicts(self):
+        """
+        共识算法解决冲突
+        使用网络中最长的链.
+        :return: <bool> True 如果链被取代, 否则为False
+        """
+        neighbours = self.nodes
+        new_chain = None
+        max_length = len(self.chain)
+
+        for node in neighbours:
+            # 在各节点中请求或寻找最长的链
+            response = requests.get(f'http://{node}/chain')
+            if response.status_code == 200:
+                length = response.json.get("length")
+                chain = response.json.get("chain")
+
+                if length > max_length and self.valid_chain(chain):
+                    max_length = length
+                    new_chain = chain
+
+        if new_chain:
+            self.chain = new_chain
+            return True
+
+        return False
 
 
 '''
